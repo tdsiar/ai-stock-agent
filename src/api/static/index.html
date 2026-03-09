@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Stock Agent</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f1117;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #ffffff;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    select {
+      background: #1e2130;
+      color: #e0e0e0;
+      border: 1px solid #2e3250;
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .charts {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .card {
+      background: #1e2130;
+      border-radius: 10px;
+      padding: 1.5rem;
+      border: 1px solid #2e3250;
+    }
+
+    .card h2 {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #8888aa;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    canvas { width: 100% !important; }
+
+    #status {
+      color: #8888aa;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>AI Stock Agent — Dashboard</h1>
+
+  <div class="controls">
+    <select id="tickerSelect"><option value="">Loading tickers...</option></select>
+    <select id="rangeSelect">
+      <option value="90">Last 90 days</option>
+      <option value="180">Last 180 days</option>
+      <option value="365" selected>Last 1 year</option>
+      <option value="9999">All time</option>
+    </select>
+  </div>
+
+  <div id="status">Select a ticker to load data.</div>
+
+  <div class="charts">
+    <div class="card">
+      <h2>Price & Moving Averages</h2>
+      <canvas id="priceChart"></canvas>
+    </div>
+    <div class="card">
+      <h2>Momentum (10-day %)</h2>
+      <canvas id="momentumChart"></canvas>
+    </div>
+    <div class="card">
+      <h2>Volume & 20-day Average</h2>
+      <canvas id="volumeChart"></canvas>
+    </div>
+  </div>
+
+<script>
+  let priceChart, momentumChart, volumeChart;
+
+  // ── Load ticker list from API ──────────────────────────────────────────────
+  async function loadTickers() {
+    const res  = await fetch("/tickers");
+    const data = await res.json();
+    const sel  = document.getElementById("tickerSelect");
+    sel.innerHTML = '<option value="">Select a ticker</option>';
+    data.tickers.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ── Load data for selected ticker ─────────────────────────────────────────
+  async function loadData() {
+    const ticker = document.getElementById("tickerSelect").value;
+    const days   = parseInt(document.getElementById("rangeSelect").value);
+    if (!ticker) return;
+
+    document.getElementById("status").textContent = `Loading ${ticker}...`;
+
+    const res  = await fetch(`/data/${ticker}`);
+    const rows = await res.json();
+
+    // Slice to selected range
+    const sliced = days >= 9999 ? rows : rows.slice(-days);
+
+    const dates      = sliced.map(r => r.date);
+    const close      = sliced.map(r => r.Close);
+    const ma7        = sliced.map(r => r.ma_7);
+    const ma30       = sliced.map(r => r.ma_30);
+    const momentum   = sliced.map(r => r.momentum_10);
+    const volume     = sliced.map(r => r.Volume);
+    const volumeMa   = sliced.map(r => r.volume_ma_20);
+
+    drawPriceChart(dates, close, ma7, ma30, ticker);
+    drawMomentumChart(dates, momentum);
+    drawVolumeChart(dates, volume, volumeMa);
+
+    document.getElementById("status").textContent =
+      `${ticker} — ${sliced.length} trading days shown`;
+  }
+
+  // ── Chart helpers ──────────────────────────────────────────────────────────
+  function destroyIfExists(chart) {
+    if (chart) chart.destroy();
+  }
+
+  function baseOptions(yLabel) {
+    return {
+      responsive: true,
+      animation: false,
+      plugins: { legend: { labels: { color: "#aaaacc" } } },
+      scales: {
+        x: {
+          ticks: { color: "#666688", maxTicksLimit: 10 },
+          grid:  { color: "#1a1d2e" }
+        },
+        y: {
+          ticks: { color: "#666688" },
+          grid:  { color: "#1a1d2e" },
+          title: { display: true, text: yLabel, color: "#666688" }
+        }
+      }
+    };
+  }
+
+  function drawPriceChart(dates, close, ma7, ma30, ticker) {
+    destroyIfExists(priceChart);
+    priceChart = new Chart(document.getElementById("priceChart"), {
+      type: "line",
+      data: {
+        labels: dates,
+        datasets: [
+          { label: `${ticker} Close`,  data: close, borderColor: "#4f9cf9", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+          { label: "MA 7",             data: ma7,   borderColor: "#f97316", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
+          { label: "MA 30",            data: ma30,  borderColor: "#a855f7", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
+        ]
+      },
+      options: baseOptions("Price (USD)")
+    });
+  }
+
+  function drawMomentumChart(dates, momentum) {
+    destroyIfExists(momentumChart);
+    momentumChart = new Chart(document.getElementById("momentumChart"), {
+      type: "bar",
+      data: {
+        labels: dates,
+        datasets: [{
+          label: "Momentum 10d %",
+          data: momentum,
+          backgroundColor: momentum.map(v => v >= 0 ? "#22c55e88" : "#ef444488"),
+          borderColor:     momentum.map(v => v >= 0 ? "#22c55e"   : "#ef4444"),
+          borderWidth: 1
+        }]
+      },
+      options: baseOptions("% Change")
+    });
+  }
+
+  function drawVolumeChart(dates, volume, volumeMa) {
+    destroyIfExists(volumeChart);
+    volumeChart = new Chart(document.getElementById("volumeChart"), {
+      type: "bar",
+      data: {
+        labels: dates,
+        datasets: [
+          { label: "Volume",      data: volume,   backgroundColor: "#4f9cf944", borderColor: "#4f9cf9", borderWidth: 1 },
+          { label: "Volume MA 20", data: volumeMa, type: "line", borderColor: "#f97316", borderWidth: 1.5, pointRadius: 0, tension: 0.1 }
+        ]
+      },
+      options: baseOptions("Shares")
+    });
+  }
+
+  // ── Event listeners ────────────────────────────────────────────────────────
+  document.getElementById("tickerSelect").addEventListener("change", loadData);
+  document.getElementById("rangeSelect").addEventListener("change", loadData);
+
+  loadTickers();
+</script>
+</body>
+</html>
