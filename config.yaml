@@ -1,0 +1,17 @@
+tickers:
+  - NVDA
+  - MSFT
+  - GOOGL
+  - META
+  - AMD
+  - PLTR
+  - SMCI
+
+data:
+  start_date: "2020-01-01"
+  end_date: "today"
+  raw_dir: "data/raw"
+
+logging:
+  log_dir: "logs"
+  log_file: "pipeline.log"
