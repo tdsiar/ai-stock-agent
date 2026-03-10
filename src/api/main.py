@@ -1,5 +1,7 @@
 import os
+import sys
 import yaml
+import sqlite3
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -14,7 +16,12 @@ with open(CONFIG_PATH, "r") as f:
 
 TICKERS       = config["tickers"]
 PROCESSED_DIR = os.path.join(BASE_DIR, config["data"]["processed_dir"])
+DB_PATH       = os.path.join(BASE_DIR, config["data"]["db_path"])
 STATIC_DIR    = os.path.join(BASE_DIR, "src", "api", "static")
+
+# Make backtest module importable
+sys.path.insert(0, BASE_DIR)
+from src.backtest.engine import backtest_ticker
 
 app = FastAPI(title="AI Stock Agent API")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -29,6 +36,17 @@ def dashboard():
 @app.get("/tickers")
 def list_tickers():
     return {"tickers": TICKERS}
+
+
+@app.get("/backtest/{ticker}")
+def get_backtest(ticker: str):
+    ticker = ticker.upper()
+    if ticker not in TICKERS:
+        raise HTTPException(status_code=404, detail=f"{ticker} not in configured tickers")
+    conn   = sqlite3.connect(DB_PATH)
+    result = backtest_ticker(ticker, conn)
+    conn.close()
+    return result
 
 
 @app.get("/data/{ticker}")

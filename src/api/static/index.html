@@ -25,8 +25,9 @@
     .controls {
       display: flex;
       gap: 1rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
       flex-wrap: wrap;
+      align-items: center;
     }
 
     select {
@@ -38,6 +39,32 @@
       font-size: 1rem;
       cursor: pointer;
     }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .tab {
+      background: #1e2130;
+      color: #8888aa;
+      border: 1px solid #2e3250;
+      border-radius: 6px;
+      padding: 0.5rem 1.25rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .tab.active {
+      background: #2e3250;
+      color: #ffffff;
+      border-color: #4f9cf9;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
 
     .charts {
       display: grid;
@@ -68,6 +95,36 @@
       font-size: 0.85rem;
       margin-bottom: 1rem;
     }
+
+    /* Backtest table */
+    .backtest-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .backtest-table th {
+      text-align: left;
+      padding: 0.6rem 1rem;
+      color: #8888aa;
+      border-bottom: 1px solid #2e3250;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+
+    .backtest-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #1a1d2e;
+    }
+
+    .backtest-table tr:last-child td { border-bottom: none; }
+
+    .positive { color: #22c55e; }
+    .negative { color: #ef4444; }
+    .neutral  { color: #e0e0e0; }
+
+    .winner { font-weight: 600; color: #4f9cf9; }
   </style>
 </head>
 <body>
@@ -84,27 +141,68 @@
     </select>
   </div>
 
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('charts')">Price Charts</button>
+    <button class="tab" onclick="switchTab('backtest')">Backtest</button>
+  </div>
+
   <div id="status">Select a ticker to load data.</div>
 
-  <div class="charts">
-    <div class="card">
-      <h2>Price & Moving Averages</h2>
-      <canvas id="priceChart"></canvas>
+  <!-- Price Charts Tab -->
+  <div id="tab-charts" class="tab-content active">
+    <div class="charts">
+      <div class="card">
+        <h2>Price & Moving Averages</h2>
+        <canvas id="priceChart"></canvas>
+      </div>
+      <div class="card">
+        <h2>Momentum (10-day %)</h2>
+        <canvas id="momentumChart"></canvas>
+      </div>
+      <div class="card">
+        <h2>Volume & 20-day Average</h2>
+        <canvas id="volumeChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backtest Tab -->
+  <div id="tab-backtest" class="tab-content">
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2>Strategy Comparison — $10,000 Starting Capital</h2>
+      <table class="backtest-table" id="backtestTable">
+        <thead>
+          <tr>
+            <th>Strategy</th>
+            <th>Final Value</th>
+            <th>Total Return</th>
+            <th>Max Drawdown</th>
+            <th>Sharpe Ratio</th>
+          </tr>
+        </thead>
+        <tbody id="backtestBody">
+          <tr><td colspan="5" style="color:#8888aa">Select a ticker to run backtest.</td></tr>
+        </tbody>
+      </table>
     </div>
     <div class="card">
-      <h2>Momentum (10-day %)</h2>
-      <canvas id="momentumChart"></canvas>
-    </div>
-    <div class="card">
-      <h2>Volume & 20-day Average</h2>
-      <canvas id="volumeChart"></canvas>
+      <h2>Portfolio Value Over Time</h2>
+      <canvas id="backtestChart"></canvas>
     </div>
   </div>
 
 <script>
-  let priceChart, momentumChart, volumeChart;
+  let priceChart, momentumChart, volumeChart, backtestChart;
 
-  // ── Load ticker list from API ──────────────────────────────────────────────
+  // Tab switching
+  function switchTab(name) {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+    document.getElementById(`tab-${name}`).classList.add("active");
+    event.target.classList.add("active");
+  }
+
+  // Load ticker list
   async function loadTickers() {
     const res  = await fetch("/tickers");
     const data = await res.json();
@@ -118,7 +216,7 @@
     });
   }
 
-  // ── Load data for selected ticker ─────────────────────────────────────────
+  // Load price chart data
   async function loadData() {
     const ticker = document.getElementById("tickerSelect").value;
     const days   = parseInt(document.getElementById("rangeSelect").value);
@@ -129,16 +227,14 @@
     const res  = await fetch(`/data/${ticker}`);
     const rows = await res.json();
 
-    // Slice to selected range
-    const sliced = days >= 9999 ? rows : rows.slice(-days);
-
-    const dates      = sliced.map(r => r.date);
-    const close      = sliced.map(r => r.Close);
-    const ma7        = sliced.map(r => r.ma_7);
-    const ma30       = sliced.map(r => r.ma_30);
-    const momentum   = sliced.map(r => r.momentum_10);
-    const volume     = sliced.map(r => r.Volume);
-    const volumeMa   = sliced.map(r => r.volume_ma_20);
+    const sliced   = days >= 9999 ? rows : rows.slice(-days);
+    const dates    = sliced.map(r => r.date);
+    const close    = sliced.map(r => r.Close);
+    const ma7      = sliced.map(r => r.ma_7);
+    const ma30     = sliced.map(r => r.ma_30);
+    const momentum = sliced.map(r => r.momentum_10);
+    const volume   = sliced.map(r => r.Volume);
+    const volumeMa = sliced.map(r => r.volume_ma_20);
 
     drawPriceChart(dates, close, ma7, ma30, ticker);
     drawMomentumChart(dates, momentum);
@@ -146,12 +242,83 @@
 
     document.getElementById("status").textContent =
       `${ticker} — ${sliced.length} trading days shown`;
+
+    // Also load backtest data
+    loadBacktest(ticker);
   }
 
-  // ── Chart helpers ──────────────────────────────────────────────────────────
-  function destroyIfExists(chart) {
-    if (chart) chart.destroy();
+  // Load and render backtest
+  async function loadBacktest(ticker) {
+    const res  = await fetch(`/backtest/${ticker}`);
+    const data = await res.json();
+
+    const strategies = ["buy_and_hold", "ma_crossover", "rsi"];
+    const labels     = { buy_and_hold: "Buy & Hold", ma_crossover: "MA Crossover", rsi: "RSI (14)" };
+
+    // Find the winner by total return
+    const best = strategies.reduce((a, b) =>
+      data[a].total_return > data[b].total_return ? a : b
+    );
+
+    // Render table
+    const tbody = document.getElementById("backtestBody");
+    tbody.innerHTML = strategies.map(s => {
+      const r        = data[s];
+      const isWinner = s === best;
+      const retClass = r.total_return >= 0 ? "positive" : "negative";
+      return `
+        <tr class="${isWinner ? "winner" : ""}">
+          <td>${labels[s]}${isWinner ? " ★" : ""}</td>
+          <td>$${r.final_value.toLocaleString()}</td>
+          <td class="${retClass}">${r.total_return}%</td>
+          <td class="negative">-${r.max_drawdown}%</td>
+          <td class="${r.sharpe_ratio >= 1 ? "positive" : "neutral"}">${r.sharpe_ratio}</td>
+        </tr>`;
+    }).join("");
+
+    // Render portfolio chart — simulate values from return percentages
+    drawBacktestChart(data, labels, ticker);
   }
+
+  // Draw portfolio growth chart
+  function drawBacktestChart(data, labels, ticker) {
+    if (backtestChart) backtestChart.destroy();
+
+    // We only have final values from the API — show as a bar chart comparison
+    const strategies = ["buy_and_hold", "ma_crossover", "rsi"];
+    const colors     = ["#4f9cf9", "#f97316", "#22c55e"];
+
+    backtestChart = new Chart(document.getElementById("backtestChart"), {
+      type: "bar",
+      data: {
+        labels: strategies.map(s => labels[s]),
+        datasets: [{
+          label: `Final Portfolio Value — ${ticker}`,
+          data: strategies.map(s => data[s].final_value),
+          backgroundColor: colors.map(c => c + "88"),
+          borderColor: colors,
+          borderWidth: 2,
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        plugins: { legend: { labels: { color: "#aaaacc" } } },
+        scales: {
+          x: { ticks: { color: "#666688" }, grid: { color: "#1a1d2e" } },
+          y: {
+            ticks: { color: "#666688", callback: v => "$" + v.toLocaleString() },
+            grid: { color: "#1a1d2e" },
+            title: { display: true, text: "Portfolio Value (USD)", color: "#666688" }
+          }
+        }
+      }
+    });
+  }
+
+  // Chart helpers
+  function destroyIfExists(chart) { if (chart) chart.destroy(); }
 
   function baseOptions(yLabel) {
     return {
@@ -159,15 +326,9 @@
       animation: false,
       plugins: { legend: { labels: { color: "#aaaacc" } } },
       scales: {
-        x: {
-          ticks: { color: "#666688", maxTicksLimit: 10 },
-          grid:  { color: "#1a1d2e" }
-        },
-        y: {
-          ticks: { color: "#666688" },
-          grid:  { color: "#1a1d2e" },
-          title: { display: true, text: yLabel, color: "#666688" }
-        }
+        x: { ticks: { color: "#666688", maxTicksLimit: 10 }, grid: { color: "#1a1d2e" } },
+        y: { ticks: { color: "#666688" }, grid: { color: "#1a1d2e" },
+             title: { display: true, text: yLabel, color: "#666688" } }
       }
     };
   }
@@ -179,9 +340,9 @@
       data: {
         labels: dates,
         datasets: [
-          { label: `${ticker} Close`,  data: close, borderColor: "#4f9cf9", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
-          { label: "MA 7",             data: ma7,   borderColor: "#f97316", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
-          { label: "MA 30",            data: ma30,  borderColor: "#a855f7", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
+          { label: `${ticker} Close`, data: close, borderColor: "#4f9cf9", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+          { label: "MA 7",           data: ma7,   borderColor: "#f97316", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
+          { label: "MA 30",          data: ma30,  borderColor: "#a855f7", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
         ]
       },
       options: baseOptions("Price (USD)")
@@ -213,7 +374,7 @@
       data: {
         labels: dates,
         datasets: [
-          { label: "Volume",      data: volume,   backgroundColor: "#4f9cf944", borderColor: "#4f9cf9", borderWidth: 1 },
+          { label: "Volume",       data: volume,   backgroundColor: "#4f9cf944", borderColor: "#4f9cf9", borderWidth: 1 },
           { label: "Volume MA 20", data: volumeMa, type: "line", borderColor: "#f97316", borderWidth: 1.5, pointRadius: 0, tension: 0.1 }
         ]
       },
@@ -221,7 +382,6 @@
     });
   }
 
-  // ── Event listeners ────────────────────────────────────────────────────────
   document.getElementById("tickerSelect").addEventListener("change", loadData);
   document.getElementById("rangeSelect").addEventListener("change", loadData);
 
