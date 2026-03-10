@@ -5,7 +5,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import date, datetime
 
-# ── Load config ──────────────────────────────────────────────────────────────
+# Load config
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.yaml")
 
@@ -19,7 +19,7 @@ RAW_DIR   = os.path.join(BASE_DIR, config["data"]["raw_dir"])
 LOG_DIR   = os.path.join(BASE_DIR, config["logging"]["log_dir"])
 LOG_FILE  = os.path.join(LOG_DIR, config["logging"]["log_file"])
 
-# ── Set up logging ────────────────────────────────────────────────────────────
+# Set up logging
 os.makedirs(RAW_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -34,7 +34,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-# ── Cache check ───────────────────────────────────────────────────────────────
+# Cache check
 def already_downloaded_today(csv_path: str) -> bool:
     """Return True if the file exists and was last modified today."""
     if not os.path.exists(csv_path):
@@ -43,7 +43,7 @@ def already_downloaded_today(csv_path: str) -> bool:
     return modified == date.today()
 
 
-# ── Fetch one ticker ──────────────────────────────────────────────────────────
+# Fetch one ticker
 def fetch_ticker(ticker: str) -> None:
     csv_path = os.path.join(RAW_DIR, f"{ticker}.csv")
 
@@ -66,7 +66,7 @@ def fetch_ticker(ticker: str) -> None:
         log.error(f"{ticker}: failed — {e}")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# Main
 if __name__ == "__main__":
     log.info("=== Pipeline run started ===")
     for ticker in TICKERS:

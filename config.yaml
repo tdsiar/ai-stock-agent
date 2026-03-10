@@ -12,6 +12,7 @@ data:
   end_date: "today"
   raw_dir: "data/raw"
   processed_dir: "data/processed"
+  db_path: "data/stocks.db"
 
 logging:
   log_dir: "logs"

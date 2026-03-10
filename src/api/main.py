@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-# ── Load config ───────────────────────────────────────────────────────────────
+# Load config
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.yaml")
 
@@ -20,7 +20,7 @@ app = FastAPI(title="AI Stock Agent API")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# Routes
 @app.get("/")
 def dashboard():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))

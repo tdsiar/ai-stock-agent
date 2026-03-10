@@ -3,7 +3,7 @@ import yaml
 import logging
 import pandas as pd
 
-# ── Load config ───────────────────────────────────────────────────────────────
+# Load config
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.yaml")
 
@@ -16,7 +16,7 @@ PROCESSED_DIR = os.path.join(BASE_DIR, config["data"]["processed_dir"])
 LOG_DIR       = os.path.join(BASE_DIR, config["logging"]["log_dir"])
 LOG_FILE      = os.path.join(LOG_DIR, config["logging"]["log_file"])
 
-# ── Logging ───────────────────────────────────────────────────────────────────
+# Logging
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
 logging.basicConfig(
@@ -30,7 +30,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-# ── Feature engineering ───────────────────────────────────────────────────────
+# Feature engineering
 def engineer_features(ticker: str) -> None:
     raw_path = os.path.join(RAW_DIR, f"{ticker}.csv")
     out_path = os.path.join(PROCESSED_DIR, f"{ticker}_features.csv")
@@ -57,7 +57,7 @@ def engineer_features(ticker: str) -> None:
     log.info(f"{ticker}: features saved → {out_path} ({len(df)} rows)")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# Main
 if __name__ == "__main__":
     log.info("=== Feature engineering started ===")
     for ticker in TICKERS:
