@@ -19,9 +19,10 @@ PROCESSED_DIR = os.path.join(BASE_DIR, config["data"]["processed_dir"])
 DB_PATH       = os.path.join(BASE_DIR, config["data"]["db_path"])
 STATIC_DIR    = os.path.join(BASE_DIR, "src", "api", "static")
 
-# Make backtest module importable
+# Make project modules importable
 sys.path.insert(0, BASE_DIR)
 from src.backtest.engine import backtest_ticker
+from src.agent.stock_agent import StockAgent
 
 app = FastAPI(title="AI Stock Agent API")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -36,6 +37,28 @@ def dashboard():
 @app.get("/tickers")
 def list_tickers():
     return {"tickers": TICKERS}
+
+
+@app.get("/agent")
+def get_agent_decisions(version: str = "v1"):
+    # version=v1 → technical only, version=v2 → technical + Buffett
+    use_buffett = version == "v2"
+    agent       = StockAgent(use_buffett=use_buffett)
+    conn        = sqlite3.connect(DB_PATH)
+    decisions   = []
+
+    for ticker in TICKERS:
+        df  = pd.read_sql(f"SELECT * FROM {ticker}", conn, index_col="date", parse_dates=["date"])
+        df  = df.sort_index()
+        row = df.iloc[-1]
+        decision = agent.decide(ticker, row)
+        decision["data_from"] = str(df.index[0].date())
+        decision["data_to"]   = str(df.index[-1].date())
+        decision["trading_days"] = len(df)
+        decisions.append(decision)
+
+    conn.close()
+    return {"version": version, "decisions": decisions}
 
 
 @app.get("/backtest/{ticker}")

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>AI Stock Agent</title>
+  <title>Buffett vs The Market</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -16,28 +16,16 @@
     }
 
     h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 1.5rem;
+      font-size: 1.8rem;
+      font-weight: 700;
       color: #ffffff;
+      margin-bottom: 0.3rem;
     }
 
-    .controls {
-      display: flex;
-      gap: 1rem;
+    .subtitle {
+      color: #8888aa;
+      font-size: 0.9rem;
       margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    select {
-      background: #1e2130;
-      color: #e0e0e0;
-      border: 1px solid #2e3250;
-      border-radius: 6px;
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      cursor: pointer;
     }
 
     /* Tabs */
@@ -45,12 +33,14 @@
       display: flex;
       gap: 0.5rem;
       margin-bottom: 1.5rem;
+      border-bottom: 1px solid #2e3250;
+      padding-bottom: 0.75rem;
     }
 
     .tab {
-      background: #1e2130;
+      background: transparent;
       color: #8888aa;
-      border: 1px solid #2e3250;
+      border: 1px solid transparent;
       border-radius: 6px;
       padding: 0.5rem 1.25rem;
       cursor: pointer;
@@ -66,11 +56,231 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
-    .charts {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 2rem;
+    /* Agent page */
+    .agent-controls {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
     }
+
+    .version-toggle {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .version-btn {
+      background: #1e2130;
+      color: #8888aa;
+      border: 1px solid #2e3250;
+      border-radius: 6px;
+      padding: 0.5rem 1.25rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .version-btn.active {
+      background: #2e3250;
+      color: #ffffff;
+      border-color: #4f9cf9;
+    }
+
+    .run-btn {
+      background: #4f9cf9;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.5rem 1.5rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .run-btn:hover { background: #3b82f6; }
+    .run-btn:disabled { background: #2e3250; color: #8888aa; cursor: not-allowed; }
+
+    #agentStatus {
+      color: #8888aa;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Decision cards grid */
+    .decisions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .decision-card {
+      background: #1e2130;
+      border-radius: 10px;
+      padding: 1.5rem;
+      border: 1px solid #2e3250;
+    }
+
+    .decision-card.buy  { border-left: 4px solid #22c55e; }
+    .decision-card.sell { border-left: 4px solid #ef4444; }
+    .decision-card.hold { border-left: 4px solid #f59e0b; }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .ticker-name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .action-badge {
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 0.3rem 0.9rem;
+      border-radius: 6px;
+    }
+
+    .action-badge.buy  { background: #22c55e22; color: #22c55e; }
+    .action-badge.sell { background: #ef444422; color: #ef4444; }
+    .action-badge.hold { background: #f59e0b22; color: #f59e0b; }
+
+    /* Plain english summary */
+    .decision-summary {
+      font-size: 0.85rem;
+      color: #c0c0d0;
+      margin-bottom: 1rem;
+      line-height: 1.5;
+      font-style: italic;
+    }
+
+    /* Confidence scale — shows -4 to +4 with zones */
+    .scale-section {
+      margin-bottom: 1rem;
+    }
+
+    .scale-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: #8888aa;
+      margin-bottom: 0.3rem;
+    }
+
+    .scale-track {
+      position: relative;
+      height: 10px;
+      border-radius: 5px;
+      background: linear-gradient(to right, #ef444488 0%, #ef444488 25%, #f59e0b88 25%, #f59e0b88 75%, #22c55e88 75%, #22c55e88 100%);
+      margin-bottom: 0.3rem;
+    }
+
+    .scale-marker {
+      position: absolute;
+      top: -3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      transform: translateX(-50%);
+      transition: left 0.4s;
+    }
+
+    .scale-marker.buy  { background: #22c55e; }
+    .scale-marker.sell { background: #ef4444; }
+    .scale-marker.hold { background: #f59e0b; }
+
+    .scale-score-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: #8888aa;
+    }
+
+    /* Signal pills */
+    .signals-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .signal-pill {
+      font-size: 0.72rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    .signal-pill.bearish  { background: #ef444422; color: #ef4444; border: 1px solid #ef444444; }
+    .signal-pill.bullish  { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e44; }
+    .signal-pill.neutral  { background: #8888aa22; color: #aaaacc; border: 1px solid #8888aa44; }
+
+    /* Buffett section */
+    .buffett-section {
+      border-top: 1px solid #2e3250;
+      padding-top: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    .buffett-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+
+    .buffett-label {
+      font-size: 0.7rem;
+      color: #a78bfa;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+
+    .buffett-adj {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.1rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .buffett-adj.positive { background: #22c55e22; color: #22c55e; }
+    .buffett-adj.negative { background: #ef444422; color: #ef4444; }
+    .buffett-adj.neutral  { background: #8888aa22; color: #aaaacc; }
+
+    .buffett-note {
+      font-size: 0.8rem;
+      color: #c4b5fd;
+      background: #1a1030;
+      border-left: 2px solid #a78bfa;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0 4px 4px 0;
+      line-height: 1.6;
+    }
+
+    /* Charts tab */
+    .chart-controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    select {
+      background: #1e2130;
+      color: #e0e0e0;
+      border: 1px solid #2e3250;
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .charts { display: grid; grid-template-columns: 1fr; gap: 2rem; }
 
     .card {
       background: #1e2130;
@@ -89,12 +299,6 @@
     }
 
     canvas { width: 100% !important; }
-
-    #status {
-      color: #8888aa;
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
-    }
 
     /* Backtest table */
     .backtest-table {
@@ -119,65 +323,93 @@
     }
 
     .backtest-table tr:last-child td { border-bottom: none; }
-
     .positive { color: #22c55e; }
     .negative { color: #ef4444; }
-    .neutral  { color: #e0e0e0; }
+    .winner   { font-weight: 600; color: #4f9cf9; }
 
-    .winner { font-weight: 600; color: #4f9cf9; }
+    #chartStatus { color: #8888aa; font-size: 0.85rem; margin-bottom: 1rem; }
   </style>
 </head>
 <body>
 
-  <h1>AI Stock Agent — Dashboard</h1>
-
-  <div class="controls">
-    <select id="tickerSelect"><option value="">Loading tickers...</option></select>
-    <select id="rangeSelect">
-      <option value="90">Last 90 days</option>
-      <option value="180">Last 180 days</option>
-      <option value="365" selected>Last 1 year</option>
-      <option value="9999">All time</option>
-    </select>
-  </div>
+  <h1>Buffett vs The Market</h1>
+  <p class="subtitle">AI-sector stock agent — technical signals vs fundamental wisdom</p>
 
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('charts')">Price Charts</button>
-    <button class="tab" onclick="switchTab('backtest')">Backtest</button>
+    <button class="tab active" onclick="switchTab('agent', this)">Agent Decisions</button>
+    <button class="tab" onclick="switchTab('charts', this)">Price Charts</button>
+    <button class="tab" onclick="switchTab('backtest', this)">Backtest</button>
   </div>
 
-  <div id="status">Select a ticker to load data.</div>
+  <!-- Agent Decisions Tab -->
+  <div id="tab-agent" class="tab-content active">
+    <div class="agent-controls">
+      <div class="version-toggle">
+        <button class="version-btn active" id="btnV1" onclick="setVersion('v1')">V1 — Technical Only</button>
+        <button class="version-btn" id="btnV2" onclick="setVersion('v2')">V2 — Buffett Advised</button>
+      </div>
+      <button class="run-btn" id="runBtn" onclick="runAgent()">Run Agent</button>
+    </div>
+    <div id="agentStatus">Press "Run Agent" to get today's decisions.</div>
+    <input
+      type="text"
+      id="tickerFilter"
+      placeholder="Filter tickers — e.g. NV, AMD, PLTR"
+      style="display:none; background:#1e2130; color:#e0e0e0; border:1px solid #2e3250;
+             border-radius:6px; padding:0.5rem 1rem; font-size:0.9rem; width:100%;
+             max-width:340px; margin-bottom:1rem; outline:none;"
+      oninput="filterCards()"
+    />
+    <div class="decisions-grid" id="decisionsGrid"></div>
+  </div>
 
   <!-- Price Charts Tab -->
-  <div id="tab-charts" class="tab-content active">
+  <div id="tab-charts" class="tab-content">
+    <div class="chart-controls">
+      <select id="tickerSelect"><option value="">Select a ticker</option></select>
+      <select id="rangeSelect">
+        <option value="90">Last 90 days</option>
+        <option value="180">Last 180 days</option>
+        <option value="365" selected>Last 1 year</option>
+        <option value="9999">All time</option>
+      </select>
+    </div>
+    <div style="margin-bottom:1rem; display:flex; gap:0.5rem; align-items:center;">
+      <input
+        type="text"
+        id="chartQuery"
+        placeholder='Try: "NVDA from Jan 2022 to today" or "AMD last 6 months"'
+        style="background:#1e2130; color:#e0e0e0; border:1px solid #2e3250;
+               border-radius:6px; padding:0.5rem 1rem; font-size:0.85rem;
+               width:100%; max-width:480px; outline:none;"
+        onkeydown="if(event.key==='Enter') parseChartQuery()"
+      />
+      <button onclick="parseChartQuery()"
+        style="background:#2e3250; color:#e0e0e0; border:1px solid #4f9cf9;
+               border-radius:6px; padding:0.5rem 1rem; cursor:pointer; font-size:0.85rem; white-space:nowrap;">
+        Go
+      </button>
+    </div>
+    <div id="chartStatus">Select a ticker to load data.</div>
     <div class="charts">
-      <div class="card">
-        <h2>Price & Moving Averages</h2>
-        <canvas id="priceChart"></canvas>
-      </div>
-      <div class="card">
-        <h2>Momentum (10-day %)</h2>
-        <canvas id="momentumChart"></canvas>
-      </div>
-      <div class="card">
-        <h2>Volume & 20-day Average</h2>
-        <canvas id="volumeChart"></canvas>
-      </div>
+      <div class="card"><h2>Price & Moving Averages</h2><canvas id="priceChart"></canvas></div>
+      <div class="card"><h2>Momentum (10-day %)</h2><canvas id="momentumChart"></canvas></div>
+      <div class="card"><h2>Volume & 20-day Average</h2><canvas id="volumeChart"></canvas></div>
     </div>
   </div>
 
   <!-- Backtest Tab -->
   <div id="tab-backtest" class="tab-content">
-    <div class="card" style="margin-bottom: 2rem;">
+    <div class="chart-controls">
+      <select id="backtestTickerSelect"><option value="">Select a ticker</option></select>
+    </div>
+    <div class="card" style="margin-bottom:2rem;">
       <h2>Strategy Comparison — $10,000 Starting Capital</h2>
-      <table class="backtest-table" id="backtestTable">
+      <table class="backtest-table">
         <thead>
           <tr>
-            <th>Strategy</th>
-            <th>Final Value</th>
-            <th>Total Return</th>
-            <th>Max Drawdown</th>
-            <th>Sharpe Ratio</th>
+            <th>Strategy</th><th>Final Value</th><th>Total Return</th>
+            <th>Max Drawdown</th><th>Sharpe Ratio</th>
           </tr>
         </thead>
         <tbody id="backtestBody">
@@ -186,144 +418,276 @@
       </table>
     </div>
     <div class="card">
-      <h2>Portfolio Value Over Time</h2>
+      <h2>Portfolio Value Comparison</h2>
       <canvas id="backtestChart"></canvas>
     </div>
   </div>
 
 <script>
   let priceChart, momentumChart, volumeChart, backtestChart;
+  let activeVersion = "v1";
 
   // Tab switching
-  function switchTab(name) {
+  function switchTab(name, el) {
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
     document.getElementById(`tab-${name}`).classList.add("active");
-    event.target.classList.add("active");
+    el.classList.add("active");
   }
 
-  // Load ticker list
-  async function loadTickers() {
-    const res  = await fetch("/tickers");
-    const data = await res.json();
-    const sel  = document.getElementById("tickerSelect");
-    sel.innerHTML = '<option value="">Select a ticker</option>';
-    data.tickers.forEach(t => {
-      const opt = document.createElement("option");
-      opt.value = t;
-      opt.textContent = t;
-      sel.appendChild(opt);
+  // Version toggle
+  function setVersion(v) {
+    activeVersion = v;
+    document.getElementById("btnV1").classList.toggle("active", v === "v1");
+    document.getElementById("btnV2").classList.toggle("active", v === "v2");
+  }
+
+  // Run agent
+  async function runAgent() {
+    const btn = document.getElementById("runBtn");
+    btn.disabled = true;
+    btn.textContent = "Running...";
+    document.getElementById("agentStatus").textContent =
+      activeVersion === "v2"
+        ? "Fetching fundamental data + running agent — this takes ~15 seconds..."
+        : "Running technical agent...";
+    document.getElementById("decisionsGrid").innerHTML = "";
+
+    try {
+      const res  = await fetch(`/agent?version=${activeVersion}`);
+      const data = await res.json();
+      renderDecisions(data.decisions, activeVersion);
+      document.getElementById("agentStatus").textContent =
+        `${activeVersion === "v2" ? "V2 Buffett Advised" : "V1 Technical"} — ${data.decisions.length} tickers analyzed`;
+    } catch (e) {
+      document.getElementById("agentStatus").textContent = "Error running agent. Is the server running?";
+    }
+
+    btn.disabled = false;
+    btn.textContent = "Run Agent";
+    document.getElementById("tickerFilter").style.display = "block";
+    document.getElementById("tickerFilter").value = "";
+  }
+
+  // Plain English summary based on action and confidence
+  function decisionSummary(action, confidence, version) {
+    if (action === "BUY") {
+      if (confidence >= 4) return "Very strong buy signal across all indicators. High conviction.";
+      return "Multiple indicators aligned bullishly. Agent recommends buying.";
+    }
+    if (action === "SELL") {
+      if (confidence <= -4) return "Very strong sell signal across all indicators. High conviction.";
+      return "Multiple indicators aligned bearishly. Agent recommends selling.";
+    }
+    // HOLD
+    if (confidence === 0)  return "Signals are balanced. No clear edge in either direction — holding.";
+    if (confidence === 1)  return "Mild bullish pressure but not enough to trigger a buy. Watching closely.";
+    if (confidence === -1) return "Mild bearish pressure but not enough to trigger a sell. Holding position.";
+    return "Mixed signals. Agent is waiting for a clearer setup.";
+  }
+
+  // Classify each signal as bullish, bearish, or neutral for pill coloring
+  function signalClass(signal) {
+    if (signal.includes("oversold") || signal.includes("crossover up") || signal.includes("lower Bollinger")) return "bullish";
+    if (signal.includes("overbought") || signal.includes("crossover down") || signal.includes("upper Bollinger")) return "bearish";
+    return "neutral";
+  }
+
+  // Render decision cards
+  function renderDecisions(decisions, version) {
+    const grid = document.getElementById("decisionsGrid");
+    grid.innerHTML = decisions.map(d => {
+      const action = d.action.toLowerCase();
+
+      // Scale marker position — score range is -4 to +4, map to 0-100%
+      const markerPct = ((d.final_confidence + 4) / 8 * 100).toFixed(1);
+
+      // Signal pills
+      const pills = d.reasons.length > 0
+        ? d.reasons.map(r => `<span class="signal-pill ${signalClass(r)}">${r}</span>`).join("")
+        : `<span class="signal-pill neutral">No strong signals</span>`;
+
+      // Buffett section
+      const buffAdj    = d.buffett_adjustment;
+      const buffClass  = buffAdj > 0 ? "positive" : buffAdj < 0 ? "negative" : "neutral";
+      const buffLabel  = buffAdj > 0 ? `+${buffAdj} boost` : buffAdj < 0 ? `${buffAdj} drag` : "neutral";
+
+      const buffettSection = version === "v2" ? `
+        <div class="buffett-section">
+          <div class="buffett-header">
+            <span class="buffett-label">Buffett Advisor</span>
+            <span class="buffett-adj ${buffClass}">${buffLabel}</span>
+          </div>
+          <div class="buffett-note">${d.buffett_note}</div>
+        </div>` : "";
+
+      return `
+        <div class="decision-card ${action}">
+          <div class="card-header">
+            <span class="ticker-name">${d.ticker}</span>
+            <span class="action-badge ${action}">${d.action}</span>
+          </div>
+
+          <div class="decision-summary">${decisionSummary(d.action, d.final_confidence, version)}</div>
+
+          <div class="scale-section">
+            <div class="scale-label-row">
+              <span>← SELL (≤-2)</span>
+              <span>HOLD</span>
+              <span>BUY (≥+2) →</span>
+            </div>
+            <div class="scale-track">
+              <div class="scale-marker ${action}" style="left:${markerPct}%"></div>
+            </div>
+            <div class="scale-score-row">
+              <span>-4</span>
+              <span>Technical: ${d.technical_confidence > 0 ? "+" : ""}${d.technical_confidence} ${version === "v2" ? `| Buffett: ${buffAdj > 0 ? "+" : ""}${buffAdj} | ` : "| "}Final: ${d.final_confidence > 0 ? "+" : ""}${d.final_confidence}</span>
+              <span>+4</span>
+            </div>
+          </div>
+
+          <div class="signals-row">${pills}</div>
+
+          <div style="font-size:0.72rem; color:#8888aa; margin-bottom:${version === 'v2' ? '0.75rem' : '0'};">
+            Learned from ${d.data_from} → ${d.data_to} &nbsp;·&nbsp; ${d.trading_days} trading days
+          </div>
+
+          ${buffettSection}
+        </div>`;
+    }).join("");
+  }
+
+  // Filter ticker cards as user types
+  function filterCards() {
+    const query = document.getElementById("tickerFilter").value.trim().toUpperCase();
+    document.querySelectorAll(".decision-card").forEach(card => {
+      const ticker = card.querySelector(".ticker-name").textContent.toUpperCase();
+      card.style.display = !query || ticker.includes(query) ? "block" : "none";
     });
   }
 
-  // Load price chart data
-  async function loadData() {
+  // Load tickers into selects
+  async function loadTickers() {
+    const res  = await fetch("/tickers");
+    const data = await res.json();
+    ["tickerSelect", "backtestTickerSelect"].forEach(id => {
+      const sel = document.getElementById(id);
+      data.tickers.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t; opt.textContent = t;
+        sel.appendChild(opt);
+      });
+    });
+  }
+
+  // Natural language chart query parser
+  function parseChartQuery() {
+    const query   = document.getElementById("chartQuery").value.trim().toUpperCase();
+    const tickers = ["NVDA", "MSFT", "GOOGL", "META", "AMD", "PLTR", "SMCI"];
+
+    // Detect ticker
+    const foundTicker = tickers.find(t => query.includes(t));
+    if (!foundTicker) {
+      document.getElementById("chartStatus").textContent = "Couldn't find a ticker. Try: NVDA, MSFT, GOOGL, META, AMD, PLTR, SMCI";
+      return;
+    }
+
+    // Set ticker dropdown
+    document.getElementById("tickerSelect").value = foundTicker;
+
+    // Detect date range keywords
+    const lower = query.toLowerCase();
+    if (lower.includes("last 3 month") || lower.includes("90 day")) {
+      document.getElementById("rangeSelect").value = "90";
+    } else if (lower.includes("last 6 month") || lower.includes("180 day")) {
+      document.getElementById("rangeSelect").value = "180";
+    } else if (lower.includes("last year") || lower.includes("1 year") || lower.includes("12 month")) {
+      document.getElementById("rangeSelect").value = "365";
+    } else if (lower.includes("all time") || lower.includes("since 2020") || lower.includes("all data")) {
+      document.getElementById("rangeSelect").value = "9999";
+    } else if (lower.includes("2020")) {
+      document.getElementById("rangeSelect").value = "9999";
+    } else if (lower.includes("2021")) {
+      document.getElementById("rangeSelect").value = "9999";
+    } else if (lower.includes("2022")) {
+      document.getElementById("rangeSelect").value = "9999";
+    } else if (lower.includes("2023")) {
+      document.getElementById("rangeSelect").value = "9999";
+    }
+
+    loadChartData();
+  }
+
+  // Price chart data
+  async function loadChartData() {
     const ticker = document.getElementById("tickerSelect").value;
     const days   = parseInt(document.getElementById("rangeSelect").value);
     if (!ticker) return;
 
-    document.getElementById("status").textContent = `Loading ${ticker}...`;
+    document.getElementById("chartStatus").textContent = `Loading ${ticker}...`;
+    const res    = await fetch(`/data/${ticker}`);
+    const rows   = await res.json();
+    const sliced = days >= 9999 ? rows : rows.slice(-days);
 
-    const res  = await fetch(`/data/${ticker}`);
-    const rows = await res.json();
-
-    const sliced   = days >= 9999 ? rows : rows.slice(-days);
-    const dates    = sliced.map(r => r.date);
-    const close    = sliced.map(r => r.Close);
-    const ma7      = sliced.map(r => r.ma_7);
-    const ma30     = sliced.map(r => r.ma_30);
-    const momentum = sliced.map(r => r.momentum_10);
-    const volume   = sliced.map(r => r.Volume);
-    const volumeMa = sliced.map(r => r.volume_ma_20);
-
-    drawPriceChart(dates, close, ma7, ma30, ticker);
-    drawMomentumChart(dates, momentum);
-    drawVolumeChart(dates, volume, volumeMa);
-
-    document.getElementById("status").textContent =
-      `${ticker} — ${sliced.length} trading days shown`;
-
-    // Also load backtest data
-    loadBacktest(ticker);
+    drawPriceChart(sliced.map(r => r.date), sliced.map(r => r.Close),
+                   sliced.map(r => r.ma_7), sliced.map(r => r.ma_30), ticker);
+    drawMomentumChart(sliced.map(r => r.date), sliced.map(r => r.momentum_10));
+    drawVolumeChart(sliced.map(r => r.date), sliced.map(r => r.Volume), sliced.map(r => r.volume_ma_20));
+    document.getElementById("chartStatus").textContent = `${ticker} — ${sliced.length} trading days`;
   }
 
-  // Load and render backtest
-  async function loadBacktest(ticker) {
+  // Backtest data
+  async function loadBacktest() {
+    const ticker = document.getElementById("backtestTickerSelect").value;
+    if (!ticker) return;
+
     const res  = await fetch(`/backtest/${ticker}`);
     const data = await res.json();
-
     const strategies = ["buy_and_hold", "ma_crossover", "rsi"];
     const labels     = { buy_and_hold: "Buy & Hold", ma_crossover: "MA Crossover", rsi: "RSI (14)" };
+    const best       = strategies.reduce((a, b) => data[a].total_return > data[b].total_return ? a : b);
 
-    // Find the winner by total return
-    const best = strategies.reduce((a, b) =>
-      data[a].total_return > data[b].total_return ? a : b
-    );
-
-    // Render table
-    const tbody = document.getElementById("backtestBody");
-    tbody.innerHTML = strategies.map(s => {
-      const r        = data[s];
-      const isWinner = s === best;
-      const retClass = r.total_return >= 0 ? "positive" : "negative";
-      return `
-        <tr class="${isWinner ? "winner" : ""}">
-          <td>${labels[s]}${isWinner ? " ★" : ""}</td>
-          <td>$${r.final_value.toLocaleString()}</td>
-          <td class="${retClass}">${r.total_return}%</td>
-          <td class="negative">-${r.max_drawdown}%</td>
-          <td class="${r.sharpe_ratio >= 1 ? "positive" : "neutral"}">${r.sharpe_ratio}</td>
-        </tr>`;
+    document.getElementById("backtestBody").innerHTML = strategies.map(s => {
+      const r = data[s];
+      return `<tr class="${s === best ? "winner" : ""}">
+        <td>${labels[s]}${s === best ? " ★" : ""}</td>
+        <td>$${r.final_value.toLocaleString()}</td>
+        <td class="${r.total_return >= 0 ? "positive" : "negative"}">${r.total_return}%</td>
+        <td class="negative">-${r.max_drawdown}%</td>
+        <td class="${r.sharpe_ratio >= 1 ? "positive" : ""}">${r.sharpe_ratio}</td>
+      </tr>`;
     }).join("");
 
-    // Render portfolio chart — simulate values from return percentages
-    drawBacktestChart(data, labels, ticker);
-  }
-
-  // Draw portfolio growth chart
-  function drawBacktestChart(data, labels, ticker) {
     if (backtestChart) backtestChart.destroy();
-
-    // We only have final values from the API — show as a bar chart comparison
-    const strategies = ["buy_and_hold", "ma_crossover", "rsi"];
-    const colors     = ["#4f9cf9", "#f97316", "#22c55e"];
-
+    const colors = ["#4f9cf9", "#f97316", "#22c55e"];
     backtestChart = new Chart(document.getElementById("backtestChart"), {
       type: "bar",
       data: {
         labels: strategies.map(s => labels[s]),
         datasets: [{
-          label: `Final Portfolio Value — ${ticker}`,
+          label: `Final Value — ${ticker}`,
           data: strategies.map(s => data[s].final_value),
           backgroundColor: colors.map(c => c + "88"),
-          borderColor: colors,
-          borderWidth: 2,
-          borderRadius: 6,
+          borderColor: colors, borderWidth: 2, borderRadius: 6,
         }]
       },
       options: {
-        responsive: true,
-        animation: false,
+        responsive: true, animation: false,
         plugins: { legend: { labels: { color: "#aaaacc" } } },
         scales: {
           x: { ticks: { color: "#666688" }, grid: { color: "#1a1d2e" } },
-          y: {
-            ticks: { color: "#666688", callback: v => "$" + v.toLocaleString() },
-            grid: { color: "#1a1d2e" },
-            title: { display: true, text: "Portfolio Value (USD)", color: "#666688" }
-          }
+          y: { ticks: { color: "#666688", callback: v => "$" + v.toLocaleString() },
+               grid: { color: "#1a1d2e" },
+               title: { display: true, text: "Portfolio Value (USD)", color: "#666688" } }
         }
       }
     });
   }
 
   // Chart helpers
-  function destroyIfExists(chart) { if (chart) chart.destroy(); }
-
   function baseOptions(yLabel) {
     return {
-      responsive: true,
-      animation: false,
+      responsive: true, animation: false,
       plugins: { legend: { labels: { color: "#aaaacc" } } },
       scales: {
         x: { ticks: { color: "#666688", maxTicksLimit: 10 }, grid: { color: "#1a1d2e" } },
@@ -334,56 +698,47 @@
   }
 
   function drawPriceChart(dates, close, ma7, ma30, ticker) {
-    destroyIfExists(priceChart);
+    if (priceChart) priceChart.destroy();
     priceChart = new Chart(document.getElementById("priceChart"), {
       type: "line",
-      data: {
-        labels: dates,
-        datasets: [
-          { label: `${ticker} Close`, data: close, borderColor: "#4f9cf9", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
-          { label: "MA 7",           data: ma7,   borderColor: "#f97316", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
-          { label: "MA 30",          data: ma30,  borderColor: "#a855f7", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
-        ]
-      },
+      data: { labels: dates, datasets: [
+        { label: `${ticker} Close`, data: close, borderColor: "#4f9cf9", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+        { label: "MA 7",           data: ma7,   borderColor: "#f97316", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
+        { label: "MA 30",          data: ma30,  borderColor: "#a855f7", borderWidth: 1.2, pointRadius: 0, tension: 0.1 },
+      ]},
       options: baseOptions("Price (USD)")
     });
   }
 
   function drawMomentumChart(dates, momentum) {
-    destroyIfExists(momentumChart);
+    if (momentumChart) momentumChart.destroy();
     momentumChart = new Chart(document.getElementById("momentumChart"), {
       type: "bar",
-      data: {
-        labels: dates,
-        datasets: [{
-          label: "Momentum 10d %",
-          data: momentum,
-          backgroundColor: momentum.map(v => v >= 0 ? "#22c55e88" : "#ef444488"),
-          borderColor:     momentum.map(v => v >= 0 ? "#22c55e"   : "#ef4444"),
-          borderWidth: 1
-        }]
-      },
+      data: { labels: dates, datasets: [{
+        label: "Momentum 10d %", data: momentum,
+        backgroundColor: momentum.map(v => v >= 0 ? "#22c55e88" : "#ef444488"),
+        borderColor: momentum.map(v => v >= 0 ? "#22c55e" : "#ef4444"), borderWidth: 1
+      }]},
       options: baseOptions("% Change")
     });
   }
 
   function drawVolumeChart(dates, volume, volumeMa) {
-    destroyIfExists(volumeChart);
+    if (volumeChart) volumeChart.destroy();
     volumeChart = new Chart(document.getElementById("volumeChart"), {
       type: "bar",
-      data: {
-        labels: dates,
-        datasets: [
-          { label: "Volume",       data: volume,   backgroundColor: "#4f9cf944", borderColor: "#4f9cf9", borderWidth: 1 },
-          { label: "Volume MA 20", data: volumeMa, type: "line", borderColor: "#f97316", borderWidth: 1.5, pointRadius: 0, tension: 0.1 }
-        ]
-      },
+      data: { labels: dates, datasets: [
+        { label: "Volume",       data: volume,   backgroundColor: "#4f9cf944", borderColor: "#4f9cf9", borderWidth: 1 },
+        { label: "Volume MA 20", data: volumeMa, type: "line", borderColor: "#f97316", borderWidth: 1.5, pointRadius: 0, tension: 0.1 }
+      ]},
       options: baseOptions("Shares")
     });
   }
 
-  document.getElementById("tickerSelect").addEventListener("change", loadData);
-  document.getElementById("rangeSelect").addEventListener("change", loadData);
+  // Event listeners
+  document.getElementById("tickerSelect").addEventListener("change", loadChartData);
+  document.getElementById("rangeSelect").addEventListener("change", loadChartData);
+  document.getElementById("backtestTickerSelect").addEventListener("change", loadBacktest);
 
   loadTickers();
 </script>
